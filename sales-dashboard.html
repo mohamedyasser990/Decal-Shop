@@ -1852,6 +1852,27 @@ function formatDate(d) {
 // ============ INIT ============
 document.getElementById('current-date').textContent = new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
+// expose functions to global scope for HTML onclick handlers
+window.navigate = navigate;
+window.toggleSidebar = toggleSidebar;
+window.closeSidebar = closeSidebar;
+window.openProductModal = openProductModal;
+window.saveProduct = saveProduct;
+window.deleteProduct = deleteProduct;
+window.calcProductMargin = calcProductMargin;
+window.openOrderModal = openOrderModal;
+window.saveOrder = saveOrder;
+window.deleteOrder = deleteOrder;
+window.addOrderItemRow = addOrderItemRow;
+window.calcOrderTotals = calcOrderTotals;
+window.setOrderStatus = setOrderStatus;
+window.openMonthModal = openMonthModal;
+window.updateInventoryQty = updateInventoryQty;
+window.exportData = exportData;
+window.importData = importData;
+window.clearAllData = clearAllData;
+window.closeModal = closeModal;
+
 loadData();
 </script>
 </body>
