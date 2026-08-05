@@ -742,7 +742,7 @@
       <div class="table-header">
         <h3>🧾 سجل الأوردرات</h3>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <input class="search-input" id="search-orders" placeholder="🔍 بحث بالاسم أو الهاتف أو التاريخ..." oninput="renderOrders()">
+          <input class="search-input" id="search-orders" placeholder="🔍 بحث بالاسم أو الهاتف أو التاريخ...">
           <button class="btn btn-primary" onclick="openOrderModal()">+ أوردر جديد</button>
         </div>
       </div>
@@ -1888,6 +1888,8 @@ function formatDate(d) {
 
 // ============ INIT ============
 document.getElementById('current-date').textContent = new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+document.getElementById('search-orders').addEventListener('input', renderOrders);
 
 // expose functions to global scope for HTML onclick handlers
 window.navigate = navigate;
