@@ -952,6 +952,10 @@
       <input type="text" id="o-tracking" placeholder="كود التتبع (اختياري)">
     </div>
     <div class="form-group">
+      <label>سعر الشحن (يظهر في الفاتورة فقط)</label>
+      <input type="number" id="o-shipping" min="0" step="0.01" placeholder="0">
+    </div>
+    <div class="form-group">
       <label>تاريخ الطلب *</label>
       <input type="date" id="o-date">
     </div>
@@ -983,6 +987,43 @@
     </div>
     <input type="hidden" id="o-status" value="pending">
     <input type="hidden" id="o-edit-id">
+  </div>
+</div>
+
+<!-- INVOICE MODAL -->
+<style>
+  #invoice-paper { background:#fff; color:#111; border-radius:10px; padding:28px; font-family:'Cairo',sans-serif; }
+  #invoice-paper .inv-head { text-align:center; border-bottom:2px solid #6c63ff; padding-bottom:14px; margin-bottom:18px; }
+  #invoice-paper .inv-brand { font-size:28px; font-weight:800; color:#6c63ff; letter-spacing:.5px; }
+  #invoice-paper .inv-sub { font-size:12px; color:#666; margin-top:2px; }
+  #invoice-paper .inv-info { display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; font-size:13px; margin-bottom:18px; }
+  #invoice-paper .inv-info span { color:#777; }
+  #invoice-paper table { width:100%; border-collapse:collapse; margin-bottom:14px; }
+  #invoice-paper th { background:#f1f0ff; color:#333; font-size:12px; padding:9px 8px; border:1px solid #e3e1fa; text-align:right; }
+  #invoice-paper td { color:#111; font-size:13px; padding:9px 8px; border:1px solid #e3e1fa; background:#fff; }
+  #invoice-paper tr:hover td { background:#fff; }
+  #invoice-paper .inv-totals { margin-right:auto; width:100%; max-width:300px; font-size:14px; }
+  #invoice-paper .inv-totals div { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #ddd; }
+  #invoice-paper .inv-totals .grand { font-size:17px; font-weight:800; color:#6c63ff; border-bottom:none; border-top:2px solid #6c63ff; margin-top:4px; padding-top:10px; }
+  #invoice-paper .inv-foot { text-align:center; font-size:12px; color:#888; margin-top:20px; }
+  @media print {
+    body * { visibility:hidden !important; }
+    #invoice-paper, #invoice-paper * { visibility:visible !important; }
+    #invoice-paper { position:fixed; inset:0; width:100%; border-radius:0; }
+    @page { margin: 12mm; }
+  }
+</style>
+<div class="modal-overlay" id="invoice-modal">
+  <div class="modal" style="max-width:720px;">
+    <div class="modal-title">
+      <span>🧾 الفاتورة</span>
+      <button class="modal-close" onclick="closeModal('invoice-modal')">✕</button>
+    </div>
+    <div id="invoice-paper"></div>
+    <div class="form-actions" style="margin-top:18px;">
+      <button class="btn btn-ghost" onclick="closeModal('invoice-modal')">إغلاق</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+    </div>
   </div>
 </div>
 
@@ -1262,6 +1303,7 @@ function openOrderModal(editId = null) {
   document.getElementById('o-phone').value = '';
   document.getElementById('o-address').value = '';
   document.getElementById('o-tracking').value = '';
+  document.getElementById('o-shipping').value = '';
   document.getElementById('o-date').value = today();
   document.getElementById('o-status').value = 'pending';
   highlightStatusBtn('pending');
@@ -1277,6 +1319,7 @@ function openOrderModal(editId = null) {
       document.getElementById('o-phone').value = o.phone || '';
       document.getElementById('o-address').value = o.address || '';
       document.getElementById('o-tracking').value = o.tracking || '';
+      document.getElementById('o-shipping').value = o.shipping || '';
       document.getElementById('o-date').value = o.date;
       const st = o.status || 'pending';
       document.getElementById('o-status').value = st;
@@ -1335,6 +1378,7 @@ async function saveOrder() {
   const phone = document.getElementById('o-phone').value.trim();
   const address = document.getElementById('o-address').value.trim();
   const tracking = document.getElementById('o-tracking').value.trim();
+  const shipping = parseFloat(document.getElementById('o-shipping').value) || 0;
   const date = document.getElementById('o-date').value;
   const editId = document.getElementById('o-edit-id').value;
 
@@ -1373,7 +1417,7 @@ async function saveOrder() {
     }
   }
 
-  const orderData = { client, phone, address, tracking, date, items, total, cost: costTotal, profit: total - costTotal, status: document.getElementById('o-status').value };
+  const orderData = { client, phone, address, tracking, shipping, date, items, total, cost: costTotal, profit: total - costTotal, status: document.getElementById('o-status').value };
 
   if (editId) {
     const idx = orders.findIndex(x => x.id === editId);
@@ -1490,6 +1534,7 @@ function renderOrders() {
       <td><span class="badge ${o.profit >= 0 ? 'badge-success' : 'badge-danger'}">${fmt(o.profit)}</span></td>
       <td>${statusBadge}</td>
       <td>
+        <button class="btn btn-primary btn-sm btn-icon" onclick="openInvoice('${o.id}')" title="فاتورة">🧾</button>
         <button class="btn btn-warning btn-sm btn-icon" onclick="openOrderModal('${o.id}')" title="تعديل">✏️</button>
         <button class="btn btn-danger btn-sm btn-icon" onclick="deleteOrder('${o.id}')" title="حذف">🗑️</button>
       </td>
@@ -1670,6 +1715,52 @@ function renderReports() {
   });
 
   renderMonthlyReport();
+}
+
+function openInvoice(id) {
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+  const shipping = parseFloat(o.shipping) || 0;
+  const grand = o.total + shipping;
+  const rows = o.items.map((it, i) => {
+    const disc = it.discount || 0;
+    const lineTotal = it.price * it.qty - disc;
+    return `<tr>
+      <td>${i + 1}</td>
+      <td>${esc(it.productName)}</td>
+      <td>${it.qty}</td>
+      <td>${fmt(it.price)}</td>
+      <td>${disc ? fmt(disc) : '—'}</td>
+      <td><strong>${fmt(lineTotal)}</strong></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('invoice-paper').innerHTML = `
+    <div class="inv-head">
+      <div class="inv-brand">Decal Shop</div>
+      <div class="inv-sub">فاتورة بيع</div>
+    </div>
+    <div class="inv-info">
+      <div><span>العميل:</span> <strong>${esc(o.client)}</strong></div>
+      <div><span>التاريخ:</span> <strong>${formatDate(o.date)}</strong></div>
+      <div><span>الهاتف:</span> <strong>${o.phone ? esc(o.phone) : '—'}</strong></div>
+      <div><span>كود التتبع:</span> <strong>${o.tracking ? esc(o.tracking) : '—'}</strong></div>
+      <div style="grid-column:1/-1;"><span>العنوان:</span> <strong>${o.address ? esc(o.address) : '—'}</strong></div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>#</th><th>المنتج</th><th>الكمية</th><th>سعر الوحدة</th><th>الخصم</th><th>الإجمالي</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="inv-totals">
+      <div><span>مجموع المنتجات</span><strong>${fmt(o.total)}</strong></div>
+      <div><span>الشحن</span><strong>${fmt(shipping)}</strong></div>
+      <div class="grand"><span>الإجمالي النهائي</span><span>${fmt(grand)}</span></div>
+    </div>
+    <div class="inv-foot">شكراً لتعاملكم مع Decal Shop</div>
+  `;
+  openModal('invoice-modal');
 }
 
 function openMonthModal(key) {
@@ -1906,6 +1997,7 @@ window.addOrderItemRow = addOrderItemRow;
 window.calcOrderTotals = calcOrderTotals;
 window.setOrderStatus = setOrderStatus;
 window.openMonthModal = openMonthModal;
+window.openInvoice = openInvoice;
 window.updateInventoryQty = updateInventoryQty;
 window.exportData = exportData;
 window.importData = importData;
