@@ -6,6 +6,7 @@
 <title>نظام إدارة المبيعات</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root {
     --bg-main: #0f1117;
@@ -1022,6 +1023,7 @@
     <div id="invoice-paper"></div>
     <div class="form-actions" style="margin-top:18px;">
       <button class="btn btn-ghost" onclick="closeModal('invoice-modal')">إغلاق</button>
+      <button class="btn btn-success" onclick="saveInvoiceImage()" id="btn-save-img">🖼️ حفظ كصورة</button>
       <button class="btn btn-primary" onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
     </div>
   </div>
@@ -1717,9 +1719,12 @@ function renderReports() {
   renderMonthlyReport();
 }
 
+let currentInvoiceOrder = null;
+
 function openInvoice(id) {
   const o = orders.find(x => x.id === id);
   if (!o) return;
+  currentInvoiceOrder = o;
   const shipping = parseFloat(o.shipping) || 0;
   const grand = o.total + shipping;
   const rows = o.items.map((it, i) => {
@@ -1761,6 +1766,36 @@ function openInvoice(id) {
     <div class="inv-foot">شكراً لتعاملكم مع Decal Shop</div>
   `;
   openModal('invoice-modal');
+}
+
+async function saveInvoiceImage() {
+  const btn = document.getElementById('btn-save-img');
+  if (typeof html2canvas === 'undefined') { showToast('❌ تعذر تحميل أداة الصورة، تأكد من الإنترنت', 'error'); return; }
+  const old = btn.textContent;
+  btn.textContent = '⏳ جاري الحفظ...';
+  btn.disabled = true;
+  try {
+    const canvas = await html2canvas(document.getElementById('invoice-paper'), {
+      scale: 2, backgroundColor: '#ffffff', useCORS: true
+    });
+    const name = 'فاتورة-' + (currentInvoiceOrder ? currentInvoiceOrder.client + '-' + currentInvoiceOrder.date : today()) + '.png';
+    await new Promise((resolve, reject) => {
+      canvas.toBlob(blob => {
+        if (!blob) { reject(new Error('blob')); return; }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+        resolve();
+      }, 'image/png');
+    });
+    showToast('✅ تم حفظ الفاتورة كصورة');
+  } catch (e) {
+    showToast('❌ حصلت مشكلة في حفظ الصورة', 'error');
+  }
+  btn.textContent = old;
+  btn.disabled = false;
 }
 
 function openMonthModal(key) {
@@ -1998,6 +2033,7 @@ window.calcOrderTotals = calcOrderTotals;
 window.setOrderStatus = setOrderStatus;
 window.openMonthModal = openMonthModal;
 window.openInvoice = openInvoice;
+window.saveInvoiceImage = saveInvoiceImage;
 window.updateInventoryQty = updateInventoryQty;
 window.exportData = exportData;
 window.importData = importData;
